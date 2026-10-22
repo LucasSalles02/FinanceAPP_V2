@@ -1,7 +1,8 @@
 package com.financeapp.nativeapp
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import com.financeapp.nativeapp.presentation.security.SecureActivity
+import com.financeapp.nativeapp.presentation.security.UnlockScreen
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -35,7 +36,7 @@ import com.financeapp.nativeapp.sync.ConnectivityObserver
 import com.financeapp.nativeapp.sync.NetworkObserver
 import com.financeapp.nativeapp.sync.SyncManager
 
-class MainActivity : ComponentActivity() {
+class MainActivity : SecureActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -56,7 +57,10 @@ class MainActivity : ComponentActivity() {
                     initial = NetworkObserver.Status.Unavailable
                 )
 
-                FinanceAppNavigation(
+                if (!unlocked) {
+                    UnlockScreen(message, pending, credentialAvailable,
+                        onUnlock = ::authenticate, onCredential = ::authenticateCredential)
+                } else FinanceAppNavigation(
                     repository = repository,
                     isOnline = isOnline == NetworkObserver.Status.Available
                 )
