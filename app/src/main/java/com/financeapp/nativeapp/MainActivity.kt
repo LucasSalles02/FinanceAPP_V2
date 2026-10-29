@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,6 +32,7 @@ import com.financeapp.nativeapp.presentation.add.AddViewModel
 import com.financeapp.nativeapp.presentation.home.HomeScreen
 import com.financeapp.nativeapp.presentation.home.HomeViewModel
 import com.financeapp.nativeapp.presentation.profile.ProfileScreen
+import com.financeapp.nativeapp.presentation.reminders.ReminderScreen
 import com.financeapp.nativeapp.presentation.theme.*
 import com.financeapp.nativeapp.sync.ConnectivityObserver
 import com.financeapp.nativeapp.sync.NetworkObserver
@@ -72,6 +74,7 @@ class MainActivity : SecureActivity() {
 sealed class Screen(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Home : Screen("home", "Extrato", Icons.Default.Home)
     object Profile : Screen("profile", "Perfil", Icons.Default.Person)
+    object Reminders : Screen("reminders", "Lembretes", Icons.Default.Notifications)
     object Add : Screen("add", "Nova Transação", Icons.Default.Add) // Não mostrado na NavBar
 }
 
@@ -98,7 +101,7 @@ fun FinanceAppNavigation(
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
                 
-                val items = listOf(Screen.Home, Screen.Profile)
+                val items = listOf(Screen.Home, Screen.Reminders, Screen.Profile)
                 
                 items.forEach { screen ->
                     val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
@@ -150,6 +153,10 @@ fun FinanceAppNavigation(
                 )
             }
             
+            composable(Screen.Reminders.route) {
+                ReminderScreen()
+            }
+
             composable(Screen.Profile.route) {
                 ProfileScreen(
                     viewModel = homeViewModel,

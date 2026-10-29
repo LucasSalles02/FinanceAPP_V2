@@ -223,3 +223,16 @@ app/src/main/java/com/financeapp/nativeapp/
     ├── SyncManager.kt
     └── SyncWorker.kt
 ```
+
+
+---
+
+## Atualização de 27/10/2026 — Aula 3: lembretes financeiros locais
+
+- Nova tela `presentation/reminders/ReminderScreen.kt` com criação, listagem e cancelamento de lembretes financeiros.
+- Novo conjunto `reminders/ReminderStore.kt`, `ReminderScheduler.kt`, `ReminderReceiver.kt` com status preservados em `SharedPreferences`, ID por lembrete e agendamento aproximado via `AlarmManager`.
+- Adicionada rota de navegação `reminders` ao `MainActivity.kt`, sem alterar os fluxos de extrato, transações, perfil, sincronização e autenticação biométrica.
+- Manifest inclui `POST_NOTIFICATIONS` e receiver interno; canal criado em `FinanceApplication.kt`.
+- Sem alterações em modelos Room, DAOs, repositório financeiro e configuração Gradle.
+- Limitações assumidas: alarmes não exatos, sem reprogramação após reboot, atraso possível em economia de bateria e ausência de testes instrumentados nesta etapa.
+- Instruções e procedimento: `docs/GUIA_AULA_3_LEMBRETES.md`.
