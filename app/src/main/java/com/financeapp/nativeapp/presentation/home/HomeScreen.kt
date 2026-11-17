@@ -1,5 +1,6 @@
 package com.financeapp.nativeapp.presentation.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -14,31 +15,61 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.financeapp.nativeapp.presentation.components.*
+import com.financeapp.nativeapp.planning.FinancialPlanRepository
+import com.financeapp.nativeapp.data.local.entity.FinancePlanEntity
+import com.financeapp.nativeapp.domain.model.Transaction
 import com.financeapp.nativeapp.presentation.theme.*
+import kotlinx.coroutines.flow.collect
 import java.text.NumberFormat
 import java.util.*
+
+private sealed class LedgerRow(val sortedAt: Long) {
+    class TransactionRow(val transaction: Transaction) : LedgerRow(transaction.date)
+    class PlannedRow(val plan: FinancePlanEntity) : LedgerRow(plan.createdAt)
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    financialPlans: FinancialPlanRepository,
     isOnline: Boolean,
-    onNavigateToAdd: () -> Unit
+    onNavigateToAdd: () -> Unit,
+    userName: String = "Usuário",
+    profilePhoto: ImageBitmap? = null,
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val transactions by viewModel.transactions.collectAsState()
+    val planned by financialPlans.plans().collectAsState(initial = emptyList())
+    val payments by financialPlans.payments().collectAsState(initial = emptyList())
+    var selectedPlanId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val paymentMap = payments.groupBy { it.planId }
+    val linkedTransactionIds = payments.map { it.transactionId }.toSet()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) {
+        viewModel.paymentErrors.collect { snackbarHostState.showSnackbar(it) }
+    }
+    // Uma única lista na aba Extrato: transações e contas programadas, sem aba separada.
+    val ledger = (transactions.map { LedgerRow.TransactionRow(it) } +
+        planned.map { LedgerRow.PlannedRow(it) }).sortedByDescending { it.sortedAt }
     val pendingCount by viewModel.pendingSyncCount.collectAsState()
     val totalReceitas by viewModel.totalReceitas.collectAsState()
     val totalDespesas by viewModel.totalDespesas.collectAsState()
@@ -51,17 +82,18 @@ fun HomeScreen(
     val currencyFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onNavigateToAdd,
-                containerColor = Primary,
+                containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White,
                 shape = CircleShape
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nova Transação")
             }
         },
-        containerColor = Background
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -82,35 +114,56 @@ fun HomeScreen(
                 ) {
                     Column {
                         Text(
-                            text = "Olá 👋",
+                            text = "Olá, ${userName.substringBefore(' ')} 👋",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = OnSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "Suas finanças",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            color = OnSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
-                    // Avatar placeholder
-                    Box(
+                    // A foto do Perfil é compartilhada com a tela inicial.
+                    // O conjunto inteiro (avatar + seta) abre a aba Perfil.
+                    Row(
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(GradientStart, GradientEnd)
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
+                            .clip(RoundedCornerShape(50.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                            .clickable(onClickLabel = "Abrir perfil", onClick = onNavigateToProfile)
+                            .padding(start = 4.dp, end = 5.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "U",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(GradientStart, GradientEnd))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (profilePhoto != null) {
+                                Image(
+                                    bitmap = profilePhoto,
+                                    contentDescription = "Foto de perfil",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Text(
+                                    text = userName.take(1).uppercase(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -149,8 +202,8 @@ fun HomeScreen(
                                 .background(
                                     Brush.linearGradient(
                                         colors = listOf(
-                                            IncomeGreen,
-                                            IncomeGreenDark
+                                            MaterialTheme.colorScheme.surfaceVariant,
+                                            if (MaterialTheme.colorScheme.background == Color.White) Color(0xFFDCF5E7) else Color(0xFF21382C)
                                         ),
                                         start = Offset.Zero,
                                         end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
@@ -166,14 +219,14 @@ fun HomeScreen(
                                     Icon(
                                         Icons.Default.TrendingUp,
                                         contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.9f),
+                                        tint = if (MaterialTheme.colorScheme.background == Color.White) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.9f),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = "Receitas",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = Color.White.copy(alpha = 0.9f),
+                                        color = if (MaterialTheme.colorScheme.background == Color.White) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.9f),
                                         letterSpacing = 0.5.sp
                                     )
                                 }
@@ -182,7 +235,7 @@ fun HomeScreen(
                                     text = currencyFormat.format(totalReceitas),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = if (MaterialTheme.colorScheme.background == Color.White) MaterialTheme.colorScheme.onSurface else Color.White
                                 )
                             }
                         }
@@ -201,8 +254,8 @@ fun HomeScreen(
                                 .background(
                                     Brush.linearGradient(
                                         colors = listOf(
-                                            ExpenseRed,
-                                            ExpenseRedDark
+                                            MaterialTheme.colorScheme.surfaceVariant,
+                                            if (MaterialTheme.colorScheme.background == Color.White) Color(0xFFFFDDE2) else Color(0xFF3A1720)
                                         ),
                                         start = Offset.Zero,
                                         end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
@@ -218,14 +271,14 @@ fun HomeScreen(
                                     Icon(
                                         Icons.Default.TrendingDown,
                                         contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.9f),
+                                        tint = if (MaterialTheme.colorScheme.background == Color.White) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.9f),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = "Despesas",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = Color.White.copy(alpha = 0.9f),
+                                        color = if (MaterialTheme.colorScheme.background == Color.White) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.9f),
                                         letterSpacing = 0.5.sp
                                     )
                                 }
@@ -234,7 +287,7 @@ fun HomeScreen(
                                     text = currencyFormat.format(totalDespesas),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = if (MaterialTheme.colorScheme.background == Color.White) MaterialTheme.colorScheme.onSurface else Color.White
                                 )
                             }
                         }
@@ -309,12 +362,12 @@ fun HomeScreen(
                         text = "Transações",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = OnSurface
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${transactions.size} registros",
+                        text = "${ledger.size} itens",
                         style = MaterialTheme.typography.bodySmall,
-                        color = OnSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -338,14 +391,14 @@ fun HomeScreen(
                             },
                             shape = RoundedCornerShape(20.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Primary.copy(alpha = 0.15f),
-                                selectedLabelColor = Primary,
-                                containerColor = SurfaceVariant,
-                                labelColor = OnSurfaceVariant
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 borderColor = Color.Transparent,
-                                selectedBorderColor = Primary.copy(alpha = 0.3f),
+                                selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
                                 enabled = true,
                                 selected = selectedPeriod == period
                             )
@@ -357,14 +410,14 @@ fun HomeScreen(
             // ═══════════════════════════════════════════════════════
             // LISTA DE TRANSAÇÕES ou ESTADO VAZIO
             // ═══════════════════════════════════════════════════════
-            if (transactions.isEmpty()) {
+            if (ledger.isEmpty()) {
                 item {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 40.dp),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Column(
                             modifier = Modifier
@@ -375,7 +428,7 @@ fun HomeScreen(
                             Icon(
                                 Icons.Default.AccountBalanceWallet,
                                 contentDescription = null,
-                                tint = OnSurfaceVariant.copy(alpha = 0.5f),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                 modifier = Modifier.size(56.dp)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
@@ -383,13 +436,13 @@ fun HomeScreen(
                                 text = "Nenhuma transação encontrada",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Medium,
-                                color = OnSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "Comece adicionando sua primeira receita ou despesa!",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = OnSurfaceVariant.copy(alpha = 0.7f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -397,19 +450,45 @@ fun HomeScreen(
                 }
             } else {
                 items(
-                    items = transactions,
-                    key = { it.id }
-                ) { transaction ->
-                    TransactionCard(
-                        transaction = transaction,
-                        onClick = { viewModel.onTransactionClick(transaction) },
-                        modifier = Modifier.combinedClickable(
-                            onClick = { viewModel.onTransactionClick(transaction) },
-                            onLongClick = { viewModel.onTransactionLongClick(transaction) }
+                    items = ledger,
+                    key = {
+                        when (it) {
+                            is LedgerRow.TransactionRow -> "tx_${it.transaction.id}"
+                            is LedgerRow.PlannedRow -> "schedule_${it.plan.id}"
+                        }
+                    }
+                ) { row ->
+                    when (row) {
+                        is LedgerRow.TransactionRow -> TransactionCard(
+                            transaction = row.transaction,
+                            onClick = { viewModel.onTransactionClick(row.transaction) },
+                            onDelete = { viewModel.onTransactionLongClick(row.transaction) },
+                            // Parcelas já são pagas/desfeitas em seu painel próprio.
+                            onTogglePaid = if (row.transaction.type == com.financeapp.nativeapp.domain.model.TransactionType.DESPESA &&
+                                row.transaction.id !in linkedTransactionIds &&
+                                !row.transaction.id.startsWith("plan_")) {
+                                { viewModel.toggleExpensePaid(row.transaction) }
+                            } else null
                         )
-                    )
+                        is LedgerRow.PlannedRow -> PlannedTransactionCard(
+                            plan = row.plan,
+                            payments = paymentMap[row.plan.id].orEmpty(),
+                            onOpen = { selectedPlanId = row.plan.id }
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    selectedPlanId?.let { id ->
+        planned.firstOrNull { it.id == id }?.let { item ->
+            PlannedTransactionDetails(
+                plan = item,
+                payments = paymentMap[item.id].orEmpty(),
+                repository = financialPlans,
+                onDismiss = { selectedPlanId = null }
+            )
         }
     }
 

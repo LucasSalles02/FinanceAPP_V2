@@ -36,6 +36,7 @@ class SyncManager(
      * O WorkManager garante que o SyncWorker só será executado quando houver internet.
      */
     fun enqueueSync() {
+        if (OfflineMode.isEnabled(context) || com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) return
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()

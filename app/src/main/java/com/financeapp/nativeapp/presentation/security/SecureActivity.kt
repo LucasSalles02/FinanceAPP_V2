@@ -5,6 +5,7 @@ import android.app.KeyguardManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.lifecycle.Lifecycle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators
@@ -30,6 +31,29 @@ open class SecureActivity : FragmentActivity() {
     private var credentialPending = false
     private var initialAttempt = true
 
+    // A folha de selecao de contas do Credential Manager eh uma Activity externa.
+    // Ela pode disparar onPause e onStop sem que o usuario tenha abandonado o login.
+    // O conteudo fica protegido contra capturas SOMENTE durante esse fluxo externo.
+    private var externalCredentialInProgress = false
+
+    protected fun beginExternalCredentialFlow() {
+        externalCredentialInProgress = true
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    protected fun finishExternalCredentialFlow() {
+        externalCredentialInProgress = false
+        // Se a operacao terminou com o app de fato em segundo plano,
+        // nao deixe a sessao protegida acessivel ao voltar ao app.
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            session.lock()
+            unlocked = false
+            pending = false
+        }
+        // Screenshots seguem permitidos no uso normal do FinanceAPP.
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
     private val credentialLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -42,7 +66,7 @@ open class SecureActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        // Capturas de tela permitidas para revisão e testes solicitados pelo usuário.
         // A restored external credential result must never unlock a new Activity.
         credentialAvailable = getSystemService(KeyguardManager::class.java).isDeviceSecure
         prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
@@ -156,7 +180,7 @@ open class SecureActivity : FragmentActivity() {
 
     override fun onPause() {
         // Hide protected content immediately, including when opening Recents.
-        if (unlocked) {
+        if (unlocked && !externalCredentialInProgress) {
             session.lock()
             unlocked = false
         }
@@ -164,7 +188,11 @@ open class SecureActivity : FragmentActivity() {
     }
 
     override fun onStop() {
-        if (!credentialPending) {
+        // Durante a escolha da conta Google, trocar o Compose pelo UnlockScreen
+        // encerra prematuramente o fluxo de credenciais em alguns aparelhos.
+        // O bloqueio sera retomado em finishExternalCredentialFlow() se o app
+        // continuar fora da tela, ou na proxima saida normal do aplicativo.
+        if (!credentialPending && !externalCredentialInProgress) {
             val wasPending = pending
             session.lock()
             unlocked = false

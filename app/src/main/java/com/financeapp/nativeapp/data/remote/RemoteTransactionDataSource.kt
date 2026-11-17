@@ -2,29 +2,18 @@ package com.financeapp.nativeapp.data.remote
 
 import com.financeapp.nativeapp.data.remote.dto.TransactionDto
 import kotlinx.coroutines.delay
-import kotlin.random.Random
 
 interface RemoteTransactionDataSource {
-    suspend fun sendTransaction(dto: TransactionDto): Result<Unit>
+    suspend fun sendTransaction(dto: TransactionDto, uid: String): Result<Unit>
+    suspend fun deleteTransaction(id: String, uid: String): Result<Unit> = Result.success(Unit)
+    suspend fun fetchTransactions(uid: String): Result<List<TransactionDto>> = Result.failure(
+        UnsupportedOperationException("Leitura remota não implementada"))
 }
 
-/**
- * Simulação de um backend remoto (Mock API).
- * Em um cenário real de produção, substituiríamos esta implementação
- * por chamadas ao Firebase Firestore ou uma API REST via Retrofit.
- */
+/** Fonte simulada usada apenas em testes; o aplicativo usa FirebaseRemoteDataSourceImpl. */
 class MockRemoteDataSourceImpl : RemoteTransactionDataSource {
-
-    override suspend fun sendTransaction(dto: TransactionDto): Result<Unit> {
-        // Simula latência de rede entre 500ms e 1500ms
-        delay(Random.nextLong(500, 1500))
-
-        // Em nosso mock, consideramos sempre sucesso (200 OK) para focar na
-        // mecânica do Modo Avião (quando está offline, a chamada nem chega aqui,
-        // ela falharia antes ou nem seria agendada pelo WorkManager/SyncManager).
-        // Se precisarmos testar resiliência com API instável (500 Error),
-        // poderíamos lançar exceções esporádicas.
-        
+    override suspend fun sendTransaction(dto: TransactionDto, uid: String): Result<Unit> {
+        delay(600)
         return Result.success(Unit)
     }
 }

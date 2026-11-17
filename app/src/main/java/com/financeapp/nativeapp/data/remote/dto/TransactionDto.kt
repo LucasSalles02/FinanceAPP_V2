@@ -12,7 +12,9 @@ data class TransactionDto(
     val category: String,
     val date: Long,
     val location: String? = null,
-    val receiptRemoteUrl: String? = null
+    val receiptRemoteUrl: String? = null,
+    val paidAt: Long? = null,
+    val lastModifiedAt: Long = 0L
 )
 
 fun Transaction.toDto(): TransactionDto {
@@ -25,6 +27,8 @@ fun Transaction.toDto(): TransactionDto {
         category = category,
         date = date,
         location = location,
-        receiptRemoteUrl = receiptRemoteUrl
+        receiptRemoteUrl = receiptRemoteUrl,
+        paidAt = paidAt,
+        lastModifiedAt = lastModifiedAt
     )
 }

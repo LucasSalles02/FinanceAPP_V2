@@ -3,6 +3,7 @@ package com.financeapp.nativeapp.presentation.reminders
 import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -18,9 +19,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,6 +47,19 @@ private enum class HistoryFilter(val label: String) {
     CANCELLED("Cancelados"), ISSUES("Não enviados")
 }
 
+private fun openPreciseAlarmPermission(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    try {
+        context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+            data = Uri.parse("package:${context.packageName}")
+        })
+    } catch (_: Exception) {
+        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${context.packageName}")
+        })
+    }
+}
+
 private fun defaultReminderTime(): Long = Calendar.getInstance().apply {
     add(Calendar.HOUR_OF_DAY, 1)
     set(Calendar.SECOND, 0)
@@ -60,6 +74,8 @@ fun ReminderScreen() {
     val coroutineScope = rememberCoroutineScope()
     var reminders by remember { mutableStateOf(ReminderStore.list(context)) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showPrecisionWarning by rememberSaveable { mutableStateOf(false) }
+    var repeatMonthly by rememberSaveable { mutableStateOf(false) }
     var title by rememberSaveable { mutableStateOf("") }
     var message by rememberSaveable { mutableStateOf("") }
     var scheduledAt by rememberSaveable { mutableStateOf(defaultReminderTime()) }
@@ -76,6 +92,7 @@ fun ReminderScreen() {
     fun refresh() { reminders = ReminderStore.list(context) }
     fun resetForm() {
         editingId = -1
+        repeatMonthly = false
         title = ""
         message = ""
         scheduledAt = defaultReminderTime()
@@ -126,7 +143,7 @@ fun ReminderScreen() {
                     feedback = "Não foi possível gerar um identificador para o lembrete."
                     return
                 }
-                val reminder = FinanceReminder(id, cleanTitle, cleanMessage, scheduledAt)
+                val reminder = FinanceReminder(id, cleanTitle, cleanMessage, scheduledAt, repeatMonthly = repeatMonthly)
                 if (!ReminderStore.add(context, reminder)) {
                     feedback = "Não foi possível salvar o lembrete."
                     return
@@ -134,7 +151,12 @@ fun ReminderScreen() {
                 if (ReminderScheduler.schedule(context, reminder)) {
                     refresh()
                     resetForm()
-                    feedback = "Lembrete agendado para notificações do Android (horário aproximado)."
+                    if (ReminderScheduler.canUseExactAlarms(context)) {
+                        feedback = "Lembrete agendado com alarme prioritário."
+                    } else {
+                        feedback = "Agendado, mas sem garantia de horário. Autorize alarmes precisos."
+                        showPrecisionWarning = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    }
                 } else {
                     ReminderStore.rollbackNew(context, id)
                     refresh()
@@ -156,7 +178,9 @@ fun ReminderScreen() {
                     message = cleanMessage,
                     scheduledAt = scheduledAt,
                     status = ReminderStatus.SCHEDULED,
-                    lastEventAt = null
+                    lastEventAt = null,
+                    repeatMonthly = repeatMonthly,
+                    repeatAnchorAt = scheduledAt
                 )
                 if (!ReminderStore.replace(context, updated)) {
                     feedback = "Não foi possível salvar a edição."
@@ -165,7 +189,12 @@ fun ReminderScreen() {
                 if (ReminderScheduler.schedule(context, updated)) {
                     refresh()
                     resetForm()
-                    feedback = "Lembrete atualizado e agendado novamente."
+                    if (ReminderScheduler.canUseExactAlarms(context)) {
+                        feedback = "Lembrete atualizado com alarme prioritário."
+                    } else {
+                        feedback = "Reagendado com horário aproximado. Autorize alarmes precisos."
+                        showPrecisionWarning = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    }
                 } else {
                     // Restaura os dados antigos caso o Android recuse o reagendamento.
                     ReminderStore.replace(context, previous)
@@ -177,6 +206,28 @@ fun ReminderScreen() {
                 }
             }
         }
+    }
+
+    if (showPrecisionWarning) {
+        AlertDialog(
+            onDismissRequest = { showPrecisionWarning = false },
+            title = { Text("Avisos no horário escolhido") },
+            text = { Text(
+                "O Android ainda não autorizou alarmes precisos para o FinanceAPP. " +
+                    "Seu lembrete foi salvo, mas pode chegar atrasado. " +
+                    "Para melhorar a pontualidade, autorize 'Alarmes e lembretes' " +
+                    "nas configurações do aparelho."
+            ) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPrecisionWarning = false
+                    openPreciseAlarmPermission(context)
+                }) { Text("Autorizar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPrecisionWarning = false }) { Text("Agora não") }
+            }
+        )
     }
 
     val reminderToDelete = reminders.firstOrNull { it.id == deletingId }
@@ -213,10 +264,7 @@ fun ReminderScreen() {
 
     val selectedFilter = HistoryFilter.entries.firstOrNull { it.name == filter } ?: HistoryFilter.ALL
     if (showSettings) {
-        ReminderNotificationSettingsScreen(
-            exactAlarmsAllowed = exactAlarmsAllowed,
-            onBack = { showSettings = false }
-        )
+        ReminderNotificationSettingsScreen(exactAlarmsAllowed = exactAlarmsAllowed, onBack = { showSettings = false })
         return
     }
     val visibleReminders = reminders.filter {
@@ -236,15 +284,12 @@ fun ReminderScreen() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Default.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text("Lembretes financeiros", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                 IconButton(onClick = { showSettings = true }) {
-                    Icon(Icons.Default.Settings, contentDescription = "Configurações")
+                    Icon(Icons.Default.Settings, contentDescription = "Configurações das notificações")
                 }
             }
         }
@@ -307,6 +352,14 @@ fun ReminderScreen() {
                             }
                         ) { Text(timeFormat.format(scheduledAt)) }
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = repeatMonthly, onCheckedChange = { repeatMonthly = it })
+                        Column {
+                            Text("Lembrar mensalmente")
+                            Text("Repetir no mesmo dia de cada mês", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                     Button(onClick = ::submitReminder, modifier = Modifier.fillMaxWidth()) {
                         Text(if (editingId >= 0) "Salvar alterações e reagendar" else "Agendar lembrete")
                     }
@@ -360,6 +413,10 @@ fun ReminderScreen() {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(reminder.title, style = MaterialTheme.typography.titleMedium)
                         Text(reminder.message, style = MaterialTheme.typography.bodyMedium)
+                        if (reminder.repeatMonthly) {
+                            Text("Repetição: mensal", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
                         Text("Previsto: ${dateTimeFormat.format(reminder.scheduledAt)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -368,7 +425,7 @@ fun ReminderScreen() {
                             ReminderStatus.DELIVERED -> "Status: Disparado"
                             ReminderStatus.CANCELLED -> "Status: Cancelado"
                             ReminderStatus.BLOCKED -> "Status: Não notificado (verifique a permissão)"
-                            ReminderStatus.MISSED -> "Status: Não disparou (celular desligado no horário)"
+                            ReminderStatus.MISSED -> "Status: Não disparou no horário (verifique restrições do Android)"
                         }, style = MaterialTheme.typography.labelMedium)
                         reminder.lastEventAt?.let { eventAt ->
                             Text("Última alteração de status: ${dateTimeFormat.format(eventAt)}",
@@ -381,6 +438,7 @@ fun ReminderScreen() {
                                 editingId = reminder.id
                                 title = reminder.title
                                 message = reminder.message
+                                repeatMonthly = reminder.repeatMonthly
                                 // Um aviso já vencido precisa de uma nova data futura.
                                 scheduledAt = if (reminder.scheduledAt > System.currentTimeMillis())
                                     reminder.scheduledAt else defaultReminderTime()
@@ -415,85 +473,48 @@ fun ReminderScreen() {
 
 
 @Composable
-private fun ReminderNotificationSettingsScreen(
-    exactAlarmsAllowed: Boolean,
-    onBack: () -> Unit
-) {
+private fun ReminderNotificationSettingsScreen(exactAlarmsAllowed: Boolean, onBack: () -> Unit) {
     val context = LocalContext.current
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Voltar") }
                 Column {
-                    Text(
-                        "Configurações",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Configurações", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Notificações", style = MaterialTheme.typography.headlineSmall)
                 }
             }
         }
-
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Notificações com o app fechado", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Para receber avisos após sair do FinanceAPP, ative as notificações e permita a execução em segundo plano nas configurações do Android.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Para receber avisos após sair do FinanceAPP, ative as notificações e permita a execução em segundo plano nas configurações do Android.")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         Text(
-                            if (exactAlarmsAllowed) "Alarmes precisos: permitidos."
-                            else "Alarmes precisos: não autorizados (os avisos continuam aproximados).",
+                            if (exactAlarmsAllowed) "Alarmes precisos autorizados · alarme prioritário ativo."
+                            else "Alarmes precisos não autorizados · avisos podem atrasar.",
                             style = MaterialTheme.typography.bodySmall
                         )
                         if (!exactAlarmsAllowed) {
-                            OutlinedButton(
-                                onClick = {
-                                    try {
-                                        context.startActivity(
-                                            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                                data = Uri.parse("package:${context.packageName}")
-                                            }
-                                        )
-                                    } catch (_: Exception) {
-                                        context.startActivity(
-                                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                data = Uri.parse("package:${context.packageName}")
-                                            }
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("Permitir alarmes precisos (opcional)") }
+                            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = {
+                                openPreciseAlarmPermission(context)
+                            }) { Text("Autorizar alarmes precisos") }
                         }
                     }
-                    OutlinedButton(
-                        onClick = {
-                            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.parse("package:${context.packageName}")
-                            })
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Abrir configurações de notificações e bateria") }
-                    Text(
-                        "Fechar pela tela de recentes é diferente de usar 'Forçar parada'. Após 'Forçar parada', o Android impede o envio até abrir o app novamente. Alguns fabricantes também restringem o app ao removê-lo dos recentes.",
+                    Text("Com alarmes precisos autorizados, o Android pode mostrar o ícone de próximo alarme na barra de status. Restrições do fabricante ainda podem afetar o funcionamento.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        })
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Abrir configurações de notificações e bateria") }
+                    Text("Fechar pela tela de recentes é diferente de usar 'Forçar parada'. Após 'Forçar parada', o Android impede o envio até abrir o app novamente. Alguns fabricantes também restringem o app ao removê-lo dos recentes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

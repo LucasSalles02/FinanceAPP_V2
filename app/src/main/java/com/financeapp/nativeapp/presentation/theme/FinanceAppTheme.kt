@@ -1,7 +1,6 @@
 package com.financeapp.nativeapp.presentation.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -19,22 +18,22 @@ import androidx.core.view.WindowCompat
 // Paleta de Cores Premium — FinanceApp Dark Theme
 // ═══════════════════════════════════════════════════════════
 
-// Cores Primárias (Índigo/Roxo vibrante)
-val Primary = Color(0xFF7C4DFF)         // Roxo vibrante
-val PrimaryVariant = Color(0xFF6200EA)  // Roxo profundo
+// Identidade premium (vermelho profundo)
+val Primary = Color(0xFFF22B42)         // Vermelho vibrante
+val PrimaryVariant = Color(0xFF9B1227)  // Vermelho profundo
 val OnPrimary = Color.White
 
 // Cores Secundárias
-val Secondary = Color(0xFF03DAC6)       // Teal
+val Secondary = Color(0xFFFF8B90)       // Rosa suave
 val OnSecondary = Color.Black
 
 // Cores de Superfície (Dark mode)
-val Background = Color(0xFF0F1117)       // Preto azulado profundo
-val Surface = Color(0xFF1A1D27)          // Superfície escura
-val SurfaceVariant = Color(0xFF242836)   // Cards / Superfície elevada
-val SurfaceContainer = Color(0xFF1E2230) // Container
-val OnBackground = Color(0xFFE8E8ED)     // Texto principal
-val OnSurface = Color(0xFFE8E8ED)        // Texto sobre superfície
+val Background = Color(0xFF0C0D12)       // Preto azulado profundo
+val Surface = Color(0xFF14151B)          // Superfície escura
+val SurfaceVariant = Color(0xFF20212A)   // Cards / Superfície elevada
+val SurfaceContainer = Color(0xFF191A22) // Container
+val OnBackground = Color(0xFFF5F4F6)     // Texto principal
+val OnSurface = Color(0xFFF5F4F6)        // Texto sobre superfície
 val OnSurfaceVariant = Color(0xFF9CA3AF) // Texto secundário
 
 // Cores Semânticas — Receita / Despesa
@@ -53,12 +52,12 @@ val SyncSynced = Color(0xFF66BB6A)       // Verde
 val OfflineRed = Color(0xFFE57373)       // Vermelho suave
 
 // Gradientes auxiliares
-val GradientStart = Color(0xFF7C4DFF)    // Roxo
-val GradientEnd = Color(0xFF448AFF)      // Azul
+val GradientStart = Color(0xFFF22B42)    // Vermelho
+val GradientEnd = Color(0xFFEA3146)      // Carmim
 
 // Outline / Bordas
-val OutlineColor = Color(0xFF374151)
-val DividerColor = Color(0xFF2D3244)
+val OutlineColor = Color(0xFF3D343D)
+val DividerColor = Color(0xFF302830)
 
 // ═══════════════════════════════════════════════════════════
 // Color Scheme Material 3 — Dark
@@ -67,12 +66,12 @@ val DividerColor = Color(0xFF2D3244)
 private val FinanceDarkColorScheme = darkColorScheme(
     primary = Primary,
     onPrimary = OnPrimary,
-    primaryContainer = Color(0xFF2A2040),
-    onPrimaryContainer = Color(0xFFD4BBFF),
+    primaryContainer = Color(0xFF401924),
+    onPrimaryContainer = Color(0xFFFFBBC3),
     secondary = Secondary,
     onSecondary = OnSecondary,
-    secondaryContainer = Color(0xFF1A3A38),
-    onSecondaryContainer = Color(0xFFA0F0E4),
+    secondaryContainer = Color(0xFF392025),
+    onSecondaryContainer = Color(0xFFFFD6D9),
     tertiary = Color(0xFFFFB74D),
     onTertiary = Color.Black,
     background = Background,
@@ -87,10 +86,40 @@ private val FinanceDarkColorScheme = darkColorScheme(
     onError = Color.White,
     errorContainer = Color(0xFF3B1414),
     onErrorContainer = Color(0xFFFFB4AB),
-    inverseSurface = Color(0xFFE8E8ED),
-    inverseOnSurface = Color(0xFF1A1D27),
+    inverseSurface = Color(0xFFF5F4F6),
+    inverseOnSurface = Color(0xFF14151B),
     inversePrimary = PrimaryVariant,
     surfaceTint = Primary,
+)
+
+// Tema claro: fundo branco, superfícies suaves e vermelho acessível como destaque.
+private val FinanceLightColorScheme = lightColorScheme(
+    primary = Color(0xFFC41E37),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE1E5),
+    onPrimaryContainer = Color(0xFF771326),
+    secondary = Color(0xFF9F253A),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFFE7EA),
+    onSecondaryContainer = Color(0xFF7C2435),
+    tertiary = Color(0xFF855A00),
+    onTertiary = Color.White,
+    background = Color.White,
+    onBackground = Color(0xFF191A20),
+    surface = Color.White,
+    onSurface = Color(0xFF191A20),
+    surfaceVariant = Color(0xFFF7F3F4),
+    onSurfaceVariant = Color(0xFF5C5660),
+    outline = Color(0xFFD8C9CE),
+    outlineVariant = Color(0xFFE9DDE1),
+    error = Color(0xFFB3261E),
+    onError = Color.White,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+    inverseSurface = Color(0xFF29262A),
+    inverseOnSurface = Color.White,
+    inversePrimary = Color(0xFFFFB3BF),
+    surfaceTint = Color(0xFFC41E37)
 )
 
 // ═══════════════════════════════════════════════════════════
@@ -185,18 +214,19 @@ val FinanceShapes = Shapes(
 
 @Composable
 fun FinanceAppTheme(
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = FinanceDarkColorScheme
+    val colorScheme = if (darkTheme) FinanceDarkColorScheme else FinanceLightColorScheme
     val view = LocalView.current
 
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Background.toArgb()
-            window.navigationBarColor = Surface.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
+            window.statusBarColor = colorScheme.background.toArgb()
+            window.navigationBarColor = colorScheme.surface.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
         }
     }
 

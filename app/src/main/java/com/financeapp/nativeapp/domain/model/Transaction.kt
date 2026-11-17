@@ -11,6 +11,7 @@ data class Transaction(
     val location: String? = null,
     val receiptLocalUri: String? = null,
     val receiptRemoteUrl: String? = null,
+    val paidAt: Long? = null, // Despesas avulsas: confirmação sem mudar o vencimento original.
     val syncStatus: SyncStatus = SyncStatus.PENDENTE,
     val lastModifiedAt: Long = System.currentTimeMillis()
 )

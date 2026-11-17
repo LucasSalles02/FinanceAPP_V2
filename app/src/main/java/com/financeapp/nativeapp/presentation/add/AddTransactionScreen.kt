@@ -28,7 +28,8 @@ import com.financeapp.nativeapp.presentation.theme.*
 @Composable
 fun AddTransactionScreen(
     viewModel: AddViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onPlanSaved: () -> Unit = onBack
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showCategoryPicker by remember { mutableStateOf(false) }
@@ -38,8 +39,9 @@ fun AddTransactionScreen(
 
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
+            val wasPlan = uiState.savedPlan
             viewModel.resetSuccessState()
-            onBack()
+            if (wasPlan) onPlanSaved() else onBack()
         }
     }
 
@@ -47,7 +49,7 @@ fun AddTransactionScreen(
     val accentColor = if (isExpense) ExpenseRed else IncomeGreen
 
     Scaffold(
-        containerColor = Background,
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -62,13 +64,13 @@ fun AddTransactionScreen(
                         Icon(
                             Icons.Default.ArrowBack,
                             contentDescription = "Voltar",
-                            tint = OnSurface
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Background,
-                    titleContentColor = OnSurface
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -97,7 +99,7 @@ fun AddTransactionScreen(
                         .clickable { viewModel.updateType(TransactionType.DESPESA) },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isExpense) ExpenseRedBg else SurfaceVariant
+                        containerColor = if (isExpense) ExpenseRedBg else MaterialTheme.colorScheme.surfaceVariant
                     ),
                     border = if (isExpense) CardDefaults.outlinedCardBorder().copy(
                         brush = androidx.compose.ui.graphics.SolidColor(ExpenseRed.copy(alpha = 0.5f))
@@ -113,14 +115,14 @@ fun AddTransactionScreen(
                         Icon(
                             Icons.Default.TrendingDown,
                             contentDescription = null,
-                            tint = if (isExpense) ExpenseRed else OnSurfaceVariant,
+                            tint = if (isExpense) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             "Despesa",
                             fontWeight = if (isExpense) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isExpense) ExpenseRed else OnSurfaceVariant
+                            color = if (isExpense) ExpenseRed else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -132,7 +134,7 @@ fun AddTransactionScreen(
                         .clickable { viewModel.updateType(TransactionType.RECEITA) },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (!isExpense) IncomeGreenBg else SurfaceVariant
+                        containerColor = if (!isExpense) IncomeGreenBg else MaterialTheme.colorScheme.surfaceVariant
                     ),
                     border = if (!isExpense) CardDefaults.outlinedCardBorder().copy(
                         brush = androidx.compose.ui.graphics.SolidColor(IncomeGreen.copy(alpha = 0.5f))
@@ -148,14 +150,14 @@ fun AddTransactionScreen(
                         Icon(
                             Icons.Default.TrendingUp,
                             contentDescription = null,
-                            tint = if (!isExpense) IncomeGreen else OnSurfaceVariant,
+                            tint = if (!isExpense) IncomeGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             "Receita",
                             fontWeight = if (!isExpense) FontWeight.Bold else FontWeight.Normal,
-                            color = if (!isExpense) IncomeGreen else OnSurfaceVariant
+                            color = if (!isExpense) IncomeGreen else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -205,7 +207,7 @@ fun AddTransactionScreen(
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = accentColor,
-                    unfocusedBorderColor = OutlineColor,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                     cursorColor = accentColor,
                     focusedLabelColor = accentColor
                 )
@@ -224,7 +226,7 @@ fun AddTransactionScreen(
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = accentColor,
-                    unfocusedBorderColor = OutlineColor,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                     cursorColor = accentColor,
                     focusedLabelColor = accentColor
                 )
@@ -269,7 +271,7 @@ fun AddTransactionScreen(
                         Icon(
                             Icons.Default.Category,
                             contentDescription = null,
-                            tint = OnSurfaceVariant,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -280,20 +282,20 @@ fun AddTransactionScreen(
                         Text(
                             "Categoria",
                             style = MaterialTheme.typography.labelSmall,
-                            color = OnSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             uiState.category.ifEmpty { "Selecione uma categoria" },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (uiState.category.isEmpty()) OnSurfaceVariant
-                            else OnSurface
+                            color = if (uiState.category.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     Icon(
                         Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
-                        tint = OnSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -319,7 +321,7 @@ fun AddTransactionScreen(
                     Icon(
                         Icons.Default.CalendarToday,
                         contentDescription = null,
-                        tint = OnSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
 
@@ -327,22 +329,78 @@ fun AddTransactionScreen(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Data da Transação",
+                            if (uiState.repeatMonthly || uiState.installmentsEnabled) "Primeiro vencimento" else "Data da transação",
                             style = MaterialTheme.typography.labelSmall,
-                            color = OnSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             dateText,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = OnSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     Icon(
                         Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
-                        tint = OnSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            // As opções novas usam a mesma linguagem visual das transações existentes.
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Frequência", style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    FilterChip(
+                        selected = !uiState.repeatMonthly && !uiState.installmentsEnabled,
+                        onClick = { viewModel.setMonthly(false); viewModel.setInstallments(false) },
+                        label = { Text("Uma vez") }
+                    )
+                    FilterChip(
+                        selected = uiState.repeatMonthly,
+                        onClick = { viewModel.setMonthly(true) },
+                        label = { Text("Todo mês") }
+                    )
+                    if (isExpense) {
+                        FilterChip(
+                            selected = uiState.installmentsEnabled,
+                            onClick = { viewModel.setInstallments(true) },
+                            label = { Text("Parcelar") }
+                        )
+                    }
+                }
+                if (uiState.installmentsEnabled && isExpense) {
+                    OutlinedTextField(
+                        value = uiState.installmentCountInput,
+                        onValueChange = viewModel::setInstallmentCountInput,
+                        label = { Text("Número de parcelas (2 a 60)") },
+                        leadingIcon = { Icon(Icons.Default.ReceiptLong, contentDescription = null) },
+                        trailingIcon = { Text("x", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            cursorColor = accentColor,
+                            focusedLabelColor = accentColor
+                        )
+                    )
+                    val count = uiState.installmentCountInput.toIntOrNull()
+                    val total = uiState.amount.replace(',', '.').toDoubleOrNull()
+                    if (count != null && count in 2..60 && total != null && total > 0) {
+                        val per = total / count
+                        val exampleValue = java.text.NumberFormat.getCurrencyInstance(
+                            java.util.Locale("pt", "BR")
+                        ).format(per)
+                        Text(
+                            "${count}x de aproximadamente $exampleValue",
+                            style = MaterialTheme.typography.labelMedium, color = accentColor
+                        )
+                    }
                 }
             }
 
@@ -376,7 +434,7 @@ fun AddTransactionScreen(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = if (isExpense) "Registrar Despesa" else "Registrar Receita",
+                        text = if (uiState.repeatMonthly || uiState.installmentsEnabled) "Programar conta" else if (isExpense) "Registrar Despesa" else "Registrar Receita",
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -404,18 +462,18 @@ fun AddTransactionScreen(
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = uiState.date
+            initialSelectedDateMillis = localDateToUtcDay(uiState.date)
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        viewModel.updateDate(it)
+                        viewModel.updateDate(utcDayToLocalDate(it))
                     }
                     showDatePicker = false
                 }) {
-                    Text("OK", color = Primary)
+                    Text("OK", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
@@ -424,16 +482,37 @@ fun AddTransactionScreen(
                 }
             },
             colors = DatePickerDefaults.colors(
-                containerColor = Surface
+                containerColor = MaterialTheme.colorScheme.surface
             )
         ) {
             DatePicker(
                 state = datePickerState,
                 colors = DatePickerDefaults.colors(
-                    containerColor = Surface,
-                    selectedDayContainerColor = Primary
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    selectedDayContainerColor = MaterialTheme.colorScheme.primary
                 )
             )
         }
     }
+}
+
+/** Material DatePicker stores midnight UTC, while the app displays local civil dates. */
+private fun localDateToUtcDay(millis: Long): Long {
+    val local = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    return java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        set(local.get(java.util.Calendar.YEAR), local.get(java.util.Calendar.MONTH),
+            local.get(java.util.Calendar.DAY_OF_MONTH))
+    }.timeInMillis
+}
+
+private fun utcDayToLocalDate(millis: Long): Long {
+    val utc = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+        timeInMillis = millis
+    }
+    return java.util.Calendar.getInstance().apply {
+        clear()
+        set(utc.get(java.util.Calendar.YEAR), utc.get(java.util.Calendar.MONTH),
+            utc.get(java.util.Calendar.DAY_OF_MONTH), 12, 0, 0)
+    }.timeInMillis
 }

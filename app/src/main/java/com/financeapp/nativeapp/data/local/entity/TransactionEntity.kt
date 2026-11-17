@@ -14,6 +14,7 @@ import com.financeapp.nativeapp.domain.model.TransactionType
 data class TransactionEntity(
     @PrimaryKey val id: String,
     val userId: String,
+    @androidx.room.ColumnInfo(defaultValue = "''") val ownerUid: String = "",
     val title: String,
     val amount: Double,
     val type: TransactionType,
@@ -22,6 +23,7 @@ data class TransactionEntity(
     val location: String? = null,
     val receiptLocalUri: String? = null,
     val receiptRemoteUrl: String? = null,
+    val paidAt: Long? = null,
     val syncStatus: SyncStatus,
     val lastModifiedAt: Long
 )
@@ -39,6 +41,7 @@ fun TransactionEntity.toDomain(): Transaction {
         location = location,
         receiptLocalUri = receiptLocalUri,
         receiptRemoteUrl = receiptRemoteUrl,
+        paidAt = paidAt,
         syncStatus = syncStatus,
         lastModifiedAt = lastModifiedAt
     )
@@ -48,6 +51,7 @@ fun Transaction.toEntity(): TransactionEntity {
     return TransactionEntity(
         id = id,
         userId = userId,
+        ownerUid = userId,
         title = title,
         amount = amount,
         type = type,
@@ -56,6 +60,7 @@ fun Transaction.toEntity(): TransactionEntity {
         location = location,
         receiptLocalUri = receiptLocalUri,
         receiptRemoteUrl = receiptRemoteUrl,
+        paidAt = paidAt,
         syncStatus = syncStatus,
         lastModifiedAt = lastModifiedAt
     )

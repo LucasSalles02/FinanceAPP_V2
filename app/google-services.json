@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "464319119497",
-    "project_id": "financeapp-d33b2",
-    "storage_bucket": "financeapp-d33b2.firebasestorage.app"
+    "project_number": "329930528537",
+    "project_id": "financeapp-v2-8b3aa",
+    "storage_bucket": "financeapp-v2-8b3aa.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:464319119497:android:aa92317965a6f756c74658",
+        "mobilesdk_app_id": "1:329930528537:android:05d692ae6740821305d788",
         "android_client_info": {
           "package_name": "com.financeapp.nativeapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "329930528537-6d9vj806d2slig8p5n5oagfnat2jl82v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.financeapp.nativeapp",
+            "certificate_hash": "eb60d8c08193e977507783469e53ce669a3233d1"
+          }
+        },
+        {
+          "client_id": "329930528537-4chfrf68d4plsrat9018kg433hbqmbag.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAt_k5kUAns9gAhw0iHWzZHtYlNXGwJ1LE"
+          "current_key": "AIzaSyAiuBs0pKVyZKKw83q21lkxdMb0TrGO_F8"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "329930528537-4chfrf68d4plsrat9018kg433hbqmbag.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

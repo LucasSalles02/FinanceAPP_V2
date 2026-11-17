@@ -8,6 +8,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.CheckCircleOutline
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,6 +32,8 @@ import java.util.*
 fun TransactionCard(
     transaction: Transaction,
     onClick: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    onTogglePaid: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val categoryInfo = CategoryUtils.getCategoryInfo(transaction.category)
@@ -42,7 +47,7 @@ fun TransactionCard(
                 if (onClick != null) Modifier.clickable { onClick() } else Modifier
             ),
         colors = CardDefaults.cardColors(
-            containerColor = SurfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         shape = MaterialTheme.shapes.medium,
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -115,6 +120,7 @@ fun TransactionCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -129,7 +135,37 @@ fun TransactionCard(
                 fontWeight = FontWeight.Bold,
                 color = amountColor
             )
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.DeleteOutline, contentDescription = "Excluir transação", tint = MaterialTheme.colorScheme.error)
+                }
+            }
         }
+            if (isExpense && onTogglePaid != null) {
+                // A ação fica numa linha discreta, sem comprimir o valor à direita.
+                TextButton(
+                    onClick = onTogglePaid,
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                    modifier = Modifier.heightIn(min = 28.dp).padding(start = 76.dp, end = 14.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = if (transaction.paidAt != null)
+                            MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Icon(
+                        if (transaction.paidAt != null) Icons.Default.CheckCircleOutline
+                        else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        if (transaction.paidAt != null) "Pago em ${formatDate(transaction.paidAt)} · Desfazer"
+                        else "Marcar como pago",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
     }
 }
 

@@ -11,7 +11,10 @@ data class FinanceReminder(
     val message: String,
     val scheduledAt: Long,
     val status: ReminderStatus = ReminderStatus.SCHEDULED,
-    val lastEventAt: Long? = null
+    val lastEventAt: Long? = null,
+    val repeatMonthly: Boolean = false,
+    val repeatAnchorAt: Long = scheduledAt,
+    val ownerUid: String = ""
 )
 
 enum class ReminderStatus { SCHEDULED, DELIVERED, CANCELLED, BLOCKED, MISSED }
@@ -22,6 +25,12 @@ object ReminderStore {
     private const val REMINDERS = "reminders"
     private const val NEXT_ID = "next_id"
 
+    private fun activeOwner(context: Context): String? = ReminderSession.currentUid(context)
+
+    private fun originalOwner(context: Context): String =
+        context.applicationContext.getSharedPreferences("financeapp_account_owner", Context.MODE_PRIVATE)
+            .getString("uid", "") ?: ""
+
     @Synchronized
     fun createId(context: Context): Int? {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -31,33 +40,44 @@ object ReminderStore {
     }
 
     @Synchronized
-    fun list(context: Context): List<FinanceReminder> = read(context)
-        .sortedWith(compareBy<FinanceReminder> { it.status != ReminderStatus.SCHEDULED }
-            .thenBy { if (it.status == ReminderStatus.SCHEDULED) it.scheduledAt else -it.scheduledAt })
+    fun list(context: Context): List<FinanceReminder> {
+        val owner = activeOwner(context) ?: return emptyList()
+        return read(context).filter { it.ownerUid == owner }
+            .sortedWith(compareBy<FinanceReminder> { it.status != ReminderStatus.SCHEDULED }
+                .thenBy { if (it.status == ReminderStatus.SCHEDULED) it.scheduledAt else -it.scheduledAt })
+    }
 
     @Synchronized
-    fun find(context: Context, id: Int): FinanceReminder? = read(context).firstOrNull { it.id == id }
+    fun find(context: Context, id: Int): FinanceReminder? {
+        val owner = activeOwner(context) ?: return null
+        return read(context).firstOrNull { it.id == id && it.ownerUid == owner }
+    }
 
     @Synchronized
     fun add(context: Context, reminder: FinanceReminder): Boolean {
+        val owner = activeOwner(context) ?: return false
         val current = read(context)
         if (current.any { it.id == reminder.id }) return false
-        return write(context, current + reminder)
+        return write(context, current + reminder.copy(ownerUid = owner))
     }
 
     /** Atualização preservando o ID e os demais lembretes. Serve também para rollback. */
     @Synchronized
     fun replace(context: Context, reminder: FinanceReminder): Boolean {
+        val owner = activeOwner(context) ?: return false
         val current = read(context)
-        if (current.none { it.id == reminder.id }) return false
-        return write(context, current.map { if (it.id == reminder.id) reminder else it })
+        if (current.none { it.id == reminder.id && it.ownerUid == owner }) return false
+        return write(context, current.map {
+            if (it.id == reminder.id && it.ownerUid == owner) reminder.copy(ownerUid = owner) else it
+        })
     }
 
     /** Exclusão usada somente para reverter uma criação malsucedida, nunca no histórico. */
     @Synchronized
     fun rollbackNew(context: Context, id: Int): Boolean {
+        val owner = activeOwner(context) ?: return false
         val current = read(context)
-        return write(context, current.filterNot { it.id == id })
+        return write(context, current.filterNot { it.id == id && it.ownerUid == owner })
     }
 
     /** Exclusão definitiva solicitada pelo usuário, distinta do cancelamento com histórico.
@@ -66,18 +86,20 @@ object ReminderStore {
      */
     @Synchronized
     fun delete(context: Context, id: Int): Boolean {
+        val owner = activeOwner(context) ?: return false
         val current = read(context)
-        if (current.none { it.id == id }) return false
-        return write(context, current.filterNot { it.id == id })
+        if (current.none { it.id == id && it.ownerUid == owner }) return false
+        return write(context, current.filterNot { it.id == id && it.ownerUid == owner })
     }
 
     @Synchronized
     fun setStatus(context: Context, id: Int, status: ReminderStatus): Boolean {
+        val owner = activeOwner(context) ?: return false
         val current = read(context)
-        val entry = current.firstOrNull { it.id == id } ?: return false
+        val entry = current.firstOrNull { it.id == id && it.ownerUid == owner } ?: return false
         if (entry.status != ReminderStatus.SCHEDULED) return false
         return write(context, current.map {
-            if (it.id == id) it.copy(status = status, lastEventAt = System.currentTimeMillis()) else it
+            if (it.id == id && it.ownerUid == owner) it.copy(status = status, lastEventAt = System.currentTimeMillis()) else it
         })
     }
 
@@ -102,7 +124,12 @@ object ReminderStore {
                         status = status,
                         // Os registros anteriores não possuem este campo, e continuam legíveis.
                         lastEventAt = if (json.isNull("lastEventAt")) null
-                            else json.optLong("lastEventAt").takeIf { it > 0L }
+                            else json.optLong("lastEventAt").takeIf { it > 0L },
+                        repeatMonthly = json.optBoolean("repeatMonthly", false),
+                        repeatAnchorAt = json.optLong("repeatAnchorAt", json.getLong("scheduledAt")),
+                        // Registros anteriores à V12 pertencem ao UID original.
+                        ownerUid = json.optString("ownerUid").takeIf { it.isNotBlank() }
+                            ?: originalOwner(context)
                     ))
                 }
             }
@@ -122,6 +149,9 @@ object ReminderStore {
                 put("scheduledAt", reminder.scheduledAt)
                 put("status", reminder.status.name)
                 put("lastEventAt", reminder.lastEventAt ?: JSONObject.NULL)
+                put("repeatMonthly", reminder.repeatMonthly)
+                put("repeatAnchorAt", reminder.repeatAnchorAt)
+                put("ownerUid", reminder.ownerUid)
             })
         }
         return context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -119,6 +119,23 @@ class HomeViewModel(
         _selectedTransaction.value = null
     }
 
+    private val _paymentErrors = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val paymentErrors = _paymentErrors.asSharedFlow()
+
+    /** Para despesas avulsas: marca/desmarca sem lançar outra despesa nem alterar o saldo. */
+    fun toggleExpensePaid(transaction: Transaction) {
+        if (transaction.type != TransactionType.DESPESA) return
+        viewModelScope.launch {
+            val updated = transaction.copy(
+                paidAt = if (transaction.paidAt == null) System.currentTimeMillis() else null
+            )
+            val result = repository.updateTransaction(updated)
+            if (result.isFailure) _paymentErrors.emit(
+                result.exceptionOrNull()?.message ?: "Não foi possível atualizar o pagamento."
+            )
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     // Operações CRUD
     // ═══════════════════════════════════════════════════════════
